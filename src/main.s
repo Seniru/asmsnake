@@ -1,6 +1,6 @@
 .intel_syntax noprefix
 
-.include "src/system.asm"
+.include "src/system.s"
 
 .global _start
 

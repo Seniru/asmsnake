@@ -131,9 +131,9 @@ getrandom:
     push        r12
     push        r13
     call        random
-    # round(from + random() * (to - from))
+    /* round(from + random() * (to - from)) */
 
-    # to - from
+    /* to - from */
     sub         r13, r12
 
     mov         rbx, 0xff
@@ -142,13 +142,13 @@ getrandom:
     cvtsi2ss    xmm2, r12
     cvtsi2ss    xmm3, r13
 
-    # random byte / 255 (to simulate random()'s behaviour)
+    /* random byte / 255 (to simulate random()'s behaviour) */
     divss       xmm0, xmm1
-    # random() * (to - from)
+    /* random() * (to - from) */
     mulss       xmm0, xmm3
-    # from + random() * (to - from)
+    /* from + random() * (to - from) */
     addss       xmm0, xmm2
-    # round the whole thing and return it to rax
+    /* round the whole thing and return it to rax */
     cvtss2si    rax, xmm0
 
     pop         r13
@@ -167,13 +167,13 @@ getrandom:
     See also: malloc, free
 */
 random:
-    # allocate memory for one byte
+    /* allocate memory for one byte */
     malloc      1
-    # store the allocated memory in r8
+    /* store the allocated memory in r8 */
     mov         r8, rax
 
     mov         rax, SYS_GETRANDOM
-    mov			rdi, r8         # *buffer
+    mov         rdi, r8         # *buffer
     mov         rsi, 1          # count
     xor         rdx, rdx        # flags
     syscall
@@ -181,9 +181,9 @@ random:
     mov         rsi, rdi
     lodsb
     mov         r9, rax
-    # free the allocated memory
+    /* free the allocated memory */
     free        r8, 1
-    # return the random byte
+    /* return the random byte */
     mov         rax, r9
     ret
 
