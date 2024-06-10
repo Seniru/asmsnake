@@ -1,8 +1,16 @@
 .intel_syntax noprefix
 
 .equ NULL,                  0
+.equ STDIN,                 0
+.equ STDOUT,                1
+.equ SIZE_OF_CHAR,          1
+.equ SIZE_OF_SHORT,         2
+.equ SIZE_OF_INT,           4
+.equ SIZE_OF_LONG,          8
 
 /*  system calls */
+.equ SYS_READ,              0
+.equ SYS_WRITE,             1
 .equ SYS_MMAP,              9
 .equ SYS_MUNMAP,            11
 .equ SYS_EXIT,              60
@@ -31,7 +39,7 @@
     Parameters:
         size
 
-    Modifies: rax, rdi, rsi, rdx, r8, r9, r10
+    Modifies: rax, rcx, rdi, rsi, rdx, r8, r9, r10
     
     Return registers:
         rax: addr
@@ -79,7 +87,7 @@
         r12: size
 
     Modifies:
-        rax, rdi, rsi, rdx, r8, r9, r10
+        rax, rcx, rdi, rsi, rdx, r8, r9, r10
 
     Output registers:
         rax: address
