@@ -3,6 +3,7 @@
 .equ NULL,                  0
 .equ STDIN,                 0
 .equ STDOUT,                1
+.equ NULL_TERMINATOR,       0
 .equ SIZE_OF_CHAR,          1
 .equ SIZE_OF_SHORT,         2
 .equ SIZE_OF_INT,           4
@@ -32,6 +33,29 @@
 .global getrandomint
 
 
+/*
+    Macro to push registers
+
+    Parameters
+        r1, r2,...
+*/
+.macro pushr regs:vararg
+    .irp register,\regs
+        push \register
+    .endr
+.endm
+
+/*
+    Macro to pop registers
+
+    Parameters:
+        r1, r2, ...
+*/
+.macro popr regs:vararg
+    .irp register,\regs
+        pop \register
+    .endr
+.endm
 /*
     Macro for mmap, this is not the actual malloc offered by C.
     Instead it uses the mmap syscall

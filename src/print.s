@@ -75,10 +75,7 @@ print_string:
     See also: malloc, free, print_string
 */
 print_usigned_int:
-    push        r12
-    push        r13
-    push        rbx
-    push        rdi
+    pushr       r12, r13, rbx, rdi
     /* determine how many digits are there in the number */
     mov         rax, r12
     xor         rcx, rcx
@@ -112,10 +109,7 @@ store_digits_loop:
     mov         r13, r8
     call        print_string
     free        r9, r8
-    pop         rdi
-    pop         rbx
-    pop         r13
-    pop         r12
+    popr        rdi, rbx, r13, r12
     ret
 
 /*
@@ -127,7 +121,7 @@ store_digits_loop:
     Modifies:
         rax
 
-    See also: print_usigned_int
+    See also: print_string, print_usigned_int
 */
 print_signed_int:
     push        r12
@@ -162,86 +156,104 @@ print_negative_sign:
         print_string, print_usigned_int, print_signed_int
 */
 printf:
-    xor         rax, rax
-    xor         rbx, rbx
+    /* rcx stores the length of the string to print */
     xor         rcx, rcx
+    /* rbx stores the index of the string */
+    xor         rbx, rbx
+    /* rdx stores the current parameter index */
     mov         rdx, 1
-    mov         rsi, [rbp - 8]          /* &buffer */
-    mov         rdi, rsi
+    mov         rdi, [rbp - 8]
+    mov         rsi, rdi
 
-print_char_loop:
+check_char_loop:
     lodsb
-    cmp         al, 0
+    inc         rcx
+    cmp         al, NULL_TERMINATOR
     je          end_string
     cmp         al, '%'
     je          handle_format
-    inc         rbx
-    jmp         print_char_loop
+    jmp         check_char_loop
 
+    /* print whatever upto now */
+print_string_partial:
+    pushr       r12, r13, rax, rdi, rsi, rdx, rcx
+    mov         r12, rdi
+    dec         rcx
+    mov         r13, rcx
+    call        print_string
+    popr        rcx, rdx, rsi, rdi, rax, r13, r12
+    mov         rdi, rsi
+    xor         rcx, rcx
+    ret
 
 handle_format:
     call        print_string_partial
-    add         rcx, rbx
-    /* count the % and format specifier */
-    add         rcx, 2
-    /* increment the parameter index */
-    inc         rdx
-    xor         rbx, rbx
-    /* load the format specifier character */
     lodsb
-    cmp         al, 's'
-    je          handle_format_string
     cmp         al, 'd'
     je          handle_format_signed_ints
     cmp         al, 'u'
     je          handle_format_usigned_ints
+    cmp         al, 's'
+    je          handle_format_string
+    jmp         handle_invalid_format_specifier
+
+handle_format_signed_ints:
+    inc         rdx
+    pushr       r12, rax, rdi, rsi, rdx, rcx
+    /* increment the parameter index */
+    mov         rax, -8
+    imul        rax, rdx
+    mov         r12, [rbp + rax]
+    call        print_signed_int
+    popr        rcx, rdx, rsi, rdi, rax, r12
+    mov         rdi, rsi
+    jmp         check_char_loop
+
+handle_format_usigned_ints:
+    /* increment the parameter index */
+    inc         rdx
+    pushr       r12, rax, rdi, rsi, rdx, rcx
+    mov         rax, -8
+    imul        rax, rdx
+    mov         r12, [rbp + rax]
+    call        print_usigned_int
+    popr        rcx, rdx, rsi, rdi, rax, r12
+    mov         rdi, rsi
+    jmp         check_char_loop
+
+    jmp         check_char_loop
 
 handle_format_string:
-    push        rsi
-
+    inc         rdx
+    pushr       r12, r13, rax, rdi, rsi, rdx, rcx
     mov         rax, -8
     imul        rax, rdx
     mov         rsi, [rbp + rax]
-
-    push        r12
-    push        r13
     call        strlen
     mov         r12, rsi
     mov         r13, rax
     call        print_string
-    pop         rsi
-    pop         r13
-    pop         r12
-    jmp         print_char_loop
+    popr        rcx, rdx, rsi, rdi, rax, r12, r13
+    mov         rdi, rsi
+    jmp         check_char_loop
 
-handle_format_usigned_ints:
-    mov         rax, -8
-    imul        rax, rdx
-    push        r12
-    mov         r12, [rbp + rax]
-    call        print_usigned_int
-    pop         r12
-    jmp         print_char_loop
-
-handle_format_signed_ints:
-    mov         rax, -8
-    imul        rax, rdx
-    push        r12
-    mov         r12, [rbp + rax]
-    call        print_signed_int
-    pop         r12
-    jmp         print_char_loop
+handle_invalid_format_specifier:
+    pushr       r12, r13, rax, rdi, rsi, rdx, rcx
+    /* just print the % */
+    lea         r12, [rsi - 1]
+    mov         r13, 1
+    call        print_string
+    popr        rcx, rdx, rsi, rdi, rax, r13, r12
+    /* 
+    we read the following character to find the format
+    however, as the character is not relevant to a format specifier
+    we should move rsi back to where that character was
+    */
+    dec         rsi
+    mov         rdi, rsi
+    mov         rcx, 1
+    jmp         check_char_loop
 
 end_string:
     call        print_string_partial
-    ret
-
-print_string_partial:
-    push        r12
-    push        r13
-    lea         r12, [rdi+rcx]
-    mov         r13, rbx
-    call        print_string
-    pop         r13
-    pop         r12
     ret
