@@ -14,6 +14,8 @@
 .equ SYS_WRITE,             1
 .equ SYS_MMAP,              9
 .equ SYS_MUNMAP,            11
+.equ SYS_IOCTL,             16
+.equ SYS_NANOSLEEP,         35
 .equ SYS_EXIT,              60
 .equ SYS_GETRANDOM,         318
 
@@ -22,6 +24,16 @@
 .equ PROT_WRITE,            2
 .equ MAP_PRIVATE,           2
 .equ MAP_ANONYMOUS,         32
+/* termio constants */
+.equ SIZEOF_TERMIOS,        34
+.equ TCGETS,                0x5401
+.equ TCSETS,                0x5402
+.equ ICANON,                0x02
+.equ ECHO,                  0X08
+.equ VMIN,                  6
+.equ VTIME,                 5
+.equ CLEAR_FLAG,            0xff & ~(ICANON | ECHO)
+
 
 .global malloc
 .global free
@@ -118,6 +130,16 @@
     pop         r12
 .endm
 
+/*
+    Convinience macro for ioctl tcgets syscall
+*/
+.macro tcgets struct
+    mov         rax, SYS_IOCTL
+    mov         rdi, STDIN
+    mov         rsi, TCGETS
+    lea         rdx, [\struct]
+    syscall
+.endm
 
 .text
 
