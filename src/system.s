@@ -100,6 +100,23 @@
     pop         r12
 .endm
 
+/*
+    Gets a random int in the given range
+
+    Parameters:
+        from, to
+
+    See also: getrandom
+*/
+.macro getrandomint from, to
+    push        r12
+    push        r13
+    mov         r12, \from
+    mov         r13, \to
+    call        getrandom
+    pop         r13
+    pop         r12
+.endm
 
 
 .text

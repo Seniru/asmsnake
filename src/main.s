@@ -9,6 +9,7 @@
 .equ HEIGHT,                    30
 .equ SNAKE_HEAD,                1
 .equ SNAKE_BODY,                2
+.equ APPLE,                     3
 .equ SNAKE_HEAD_INITIAL_X,      WIDTH / 2
 .equ SNAKE_HEAD_INIIIAL_Y,      HEIGHT / 2
 
@@ -53,6 +54,7 @@ snakeheadx:     .short SNAKE_HEAD_INITIAL_X
 .bss
 
 .lcomm grid WIDTH * HEIGHT
+.lcomm appleloc 1
 
 .text
 
@@ -69,6 +71,7 @@ _start:
 
 
 draw_grid:
+    call        prepare_grid
     call        clear_screen
     /* draw the top wall */
     call        draw_horizontal_boundary
@@ -79,17 +82,6 @@ draw_grid:
     mov         r15, 1
     xor         rcx, rcx
     lea         rsi, [grid]
-    xor         rax, rax
-    xor         rbx, rbx
-    mov         ax, [snakeheadx]
-    mov         bx, [snakeheady]
-    mov         dx, WIDTH
-    /* snakehead location = snakeheady * WIDTH + snakeheadx */
-    imul        bx, dx
-    add         bx, ax
-    mov         byte ptr [rsi + rbx], SNAKE_HEAD
-    mov         byte ptr [rsi + rbx - 1], SNAKE_BODY
-    mov         byte ptr [rsi + rbx - 2], SNAKE_BODY
 draw_grid_start:
     xor         rax, rax
     lodsb
@@ -99,6 +91,8 @@ draw_grid_start:
     je          print_snake_head
     cmp         al, SNAKE_BODY
     je          print_snake_body
+    cmp         al, APPLE
+    je          print_apple
 draw_grid_cont:
     inc         rcx
     inc         r15
@@ -135,6 +129,10 @@ print_snake_body:
     printchar   [snakebody]
     jmp         draw_grid_cont
 
+print_apple:
+    printchar   [apple]
+    jmp         draw_grid_cont
+
 draw_horizontal_boundary:
     lea         r12, [blank]
     mov         r13, 1
@@ -148,6 +146,33 @@ draw_horizontal_boundary_loop:
     println
     ret
 
+    /* prepare teh grid, snake and apple */
+prepare_grid:
+    lea         rsi, [grid]
+    xor         rax, rax
+    xor         rbx, rbx
+    mov         ax, [snakeheadx]
+    mov         bx, [snakeheady]
+    mov         dx, WIDTH
+    /* snakehead location = snakeheady * WIDTH + snakeheadx */
+    imul        bx, dx
+    add         bx, ax
+    mov         byte ptr [rsi + rbx], SNAKE_HEAD
+    mov         byte ptr [rsi + rbx - 1], SNAKE_BODY
+    mov         byte ptr [rsi + rbx - 2], SNAKE_BODY
+    
+    call        place_apple
+    ret
+
+place_apple:
+    getrandomint 0, WIDTH*HEIGHT
+    mov         r12, rax
+    lea         rsi, [grid]
+    /* if the location is not empty, try again */
+    cmp         byte ptr [rsi + r12], 0
+    jne         place_apple
+    mov         byte ptr [rsi + r12], APPLE
+    ret
 
 clear_screen:
     pushr       r12, r13
