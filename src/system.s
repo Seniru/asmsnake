@@ -8,6 +8,7 @@
 .equ SIZE_OF_SHORT,         2
 .equ SIZE_OF_INT,           4
 .equ SIZE_OF_LONG,          8
+.equ SIZE_OF_POINTER,       8
 
 /*  system calls */
 .equ SYS_READ,              0

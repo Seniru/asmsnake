@@ -11,7 +11,7 @@
 .equ SNAKE_BODY,                2
 .equ APPLE,                     3
 .equ SNAKE_HEAD_INITIAL_X,      WIDTH / 2
-.equ SNAKE_HEAD_INIIIAL_Y,      HEIGHT / 2
+.equ SNAKE_HEAD_INITIAL_Y,      HEIGHT / 2
 
 .equ DIRECTION.UP,              0
 .equ DIRECTION.DOWN,            1
@@ -78,12 +78,15 @@
 
     .if \object == SNAKE_HEAD
     /* check if it had an apple previously */
+    
     jmp     check_apple
-    .endif
 
-    mov     byte ptr [rsi + rbx], \object
+    .else
+    /* body moves forward (replicate it by just putting a body in the grid) */
+    mov     byte ptr [rsi + rbx], SNAKE_BODY
     /* mov    byte ptr [rsi + rbx - 1], SNAKE_BODY
     mov     byte ptr [rsi + rbx - 2], SNAKE_BODY */
+    .endif
 .endm
 
 .data
@@ -96,17 +99,46 @@ bottomleftwall:     .byte 0xe2, 0x94, 0x94 # └
 bottomrightwall:    .byte 0xe2, 0x94, 0x98 # ┘
 apple:              .byte 0xe2, 0x98, 0x85 # ★
 snakehead:          .byte 0xe2, 0x9a, 0x89 # ⚉
+snakebody:          .byte 0xe2, 0x99, 0xbc # ♼
 newline:            .ascii "\n"
 clr:                .ascii "\033c"
 blank:              .ascii " "
-snakebody:          .ascii "+"
 scoretext:          .ascii "Score: "
 scoretextlen        = $ - scoretext
-snakeheady:         .short SNAKE_HEAD_INIIIAL_Y
+snakeheady:         .short SNAKE_HEAD_INITIAL_Y
 snakeheadx:         .short SNAKE_HEAD_INITIAL_X
 sleepreq:           .quad 1, 0
 score:              .quad 0
 currentdir:         .byte DIRECTION.RIGHT
+    /* doubly-linked list to stores structs of snake's body parts */
+    /* the C equivalent of the body part would look something like this
+    /* struct BodyPart {
+        short x;
+        short y;
+        struct BodyPart *pre;
+        struct BodyPart *next;
+    };
+    */
+snakebody1:
+    .short SNAKE_HEAD_INITIAL_X - 1
+    .short SNAKE_HEAD_INITIAL_Y
+    .quad snakeparts
+    .quad snakebody2
+snakebody2:
+    .short SNAKE_HEAD_INITIAL_X - 2
+    .short SNAKE_HEAD_INITIAL_Y
+    .quad snakebody1
+    .quad NULL
+tail:               .quad snakebody2
+snakeparts:
+    /* head of the linked list */
+    .short SNAKE_HEAD_INITIAL_X
+    .short SNAKE_HEAD_INITIAL_Y
+    .quad NULL
+    .quad snakebody1
+
+.equ SIZEOF_BODYPART, SIZE_OF_SHORT + SIZE_OF_SHORT + SIZE_OF_INT + SIZE_OF_INT
+
 
 .bss
 
@@ -206,7 +238,7 @@ print_snake_head:
     jmp         draw_grid_cont
 
 print_snake_body:
-    printchar   [snakebody]
+    printunicode [snakebody]
     jmp         draw_grid_cont
 
 print_apple:
@@ -229,6 +261,8 @@ draw_horizontal_boundary_loop:
     /* prepare teh grid, snake and apple */
 prepare_grid:
     call        place_head
+    mov         byte ptr [rsi + rbx - 1], SNAKE_BODY
+    mov         byte ptr [rsi + rbx - 2], SNAKE_BODY
     call        place_apple
     ret
 
@@ -277,34 +311,86 @@ move:
     je          moveleft
     cmp         byte ptr [currentdir], DIRECTION.RIGHT
     je          moveright
+move_cont:
+    /* allocate memory for a new body part */
+    malloc      SIZEOF_BODYPART
+    mov         rbx, rax
+    /* new body's head is snake head */
+    lea         rax, [snakeparts]
+    mov         qword ptr [rbx + SIZE_OF_SHORT + SIZE_OF_SHORT], rax
+    /* new body's next is head's original next */
+    mov         rax, qword ptr [snakeparts + SIZE_OF_SHORT + SIZE_OF_SHORT + SIZE_OF_POINTER]
+    mov         qword ptr [rbx + SIZE_OF_SHORT + SIZE_OF_SHORT + SIZE_OF_POINTER], rax
+    /* update parent property of head's old next */
+    mov         qword ptr [rax + SIZE_OF_SHORT + SIZE_OF_SHORT], rbx
+    /*
+        when body moves forward, set head's next element to a new body part
+        so that, new bodypart1.x = oldhead.x, new bodypart1.y = oldhead.y
+    */
+    mov         ax, [snakeparts]
+    mov         word ptr [rbx], ax
+    mov         ax, [snakeparts + SIZE_OF_SHORT]
+    mov         word ptr [rbx + SIZE_OF_SHORT], ax
+    /* update the head in the linked list */
+    mov         ax, [snakeheadx]
+    mov         word ptr [snakeparts], ax
+    mov         ax, [snakeheady]
+    mov         word ptr [snakeparts + SIZE_OF_SHORT], ax
+    mov         qword ptr [snakeparts + SIZE_OF_SHORT + SIZE_OF_SHORT + SIZE_OF_POINTER], rbx
+    /* 
+        remove the tail 
+        1. remove the tail from the grid
+        2. remove the tail from the linked list
+        3. set new last body part as the tail
+    */
+    xor         rax, rax
+    xor         rbx, rbx
+    mov         rdx, [tail]
+    mov         ax, [rdx]
+    mov         bx, [rdx + SIZE_OF_SHORT]
+    xor         rdx, rdx
+    mov         dx, WIDTH
+    /*  location = y * WIDTH + x */
+    imul        bx, dx
+    add         bx, ax
+    lea         rsi, [grid]
+    mov         byte ptr [rsi + rbx], NULL
+    /* to remove the tail, we simply remove it from it's parent */
+    xor         rbx, rbx
+    mov         rax, [tail]
+    mov         rax, [rax + SIZE_OF_SHORT + SIZE_OF_SHORT]
+    mov         qword ptr [rax + SIZE_OF_SHORT + SIZE_OF_SHORT + SIZE_OF_POINTER], NULL
+    /* set the new tail */
+    mov         qword ptr [tail], rax
+    ret
 
 moveup:
     call        remove_head
     mov         byte ptr [currentdir], DIRECTION.UP
     dec         dword ptr [snakeheady]
     call        place_head
-    ret
+    jmp         move_cont
 
 movedown:
     call        remove_head
     mov         byte ptr [currentdir], DIRECTION.DOWN
     inc         dword ptr [snakeheady]
     call        place_head
-    ret
+    jmp         move_cont
 
 moveleft:
     call        remove_head
     mov         byte ptr [currentdir], DIRECTION.LEFT
     dec         dword ptr [snakeheadx]
     call        place_head
-    ret
+    jmp         move_cont
 
 moveright:
     call        remove_head
     mov         byte ptr [currentdir], DIRECTION.RIGHT
     inc         dword ptr [snakeheadx]
     call        place_head
-    ret
+    jmp         move_cont
 
 check_apple:
     cmp         byte ptr [rsi + rbx], APPLE
