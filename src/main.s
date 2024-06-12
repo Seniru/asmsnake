@@ -78,8 +78,7 @@
 
     .if \object == SNAKE_HEAD
     /* check if it had an apple previously */
-    
-    jmp     check_apple
+    jmp     check_location
 
     .else
     /* body moves forward (replicate it by just putting a body in the grid) */
@@ -105,9 +104,11 @@ clr:                .ascii "\033c"
 blank:              .ascii " "
 scoretext:          .ascii "Score: "
 scoretextlen        = $ - scoretext
+gameovertext:       .ascii "Game Over!\n"
+gameovertextlen     = $ - gameovertext
 snakeheady:         .short SNAKE_HEAD_INITIAL_Y
 snakeheadx:         .short SNAKE_HEAD_INITIAL_X
-sleepreq:           .quad 1, 0
+sleepreq:           .quad 0, 500000000
 score:              .quad 0
 currentdir:         .byte DIRECTION.RIGHT
     /* doubly-linked list to stores structs of snake's body parts */
@@ -173,13 +174,7 @@ gameloop:
 draw_grid:
     call        clear_screen
     println
-    lea         r12, [scoretext]
-    mov         r13, scoretextlen
-    call        print_string
-    mov         r12, score
-    call        print_usigned_int
-    println
-    println
+    call        print_score
     /* draw the top wall */
     printunicode_nopreserve [topleftwall]
     call        draw_horizontal_boundary
@@ -293,8 +288,8 @@ clear_screen:
     ret
 
 sleep:
-    mov         qword ptr [sleepreq], 1
-    mov         qword ptr [sleepreq + 8], 0
+    mov         qword ptr [sleepreq], 0
+    mov         qword ptr [sleepreq + 8], 500000000
     mov         rax, SYS_NANOSLEEP
     lea         rdi, [sleepreq]
     syscall
@@ -392,10 +387,20 @@ moveright:
     call        place_head
     jmp         move_cont
 
+check_location:
+    call        check_eating_self
+    call        check_apple
+    ret
+
 check_apple:
     cmp         byte ptr [rsi + rbx], APPLE
     je          eat_apple
     mov         byte ptr [rsi + rbx], SNAKE_HEAD
+    ret
+
+check_eating_self:
+    cmp         byte ptr [rsi + rbx], SNAKE_BODY
+    je          gameover
     ret
 
 eat_apple:
@@ -416,7 +421,6 @@ eat_apple:
     /* set the previous tail's next to the new element */
     mov         [rdx + SIZE_OF_SHORT + SIZE_OF_SHORT + SIZE_OF_POINTER], rbx
     mov         qword ptr [tail], rbx
-here:
     lea         rbx, [tail]
 
     call        place_apple
@@ -459,3 +463,23 @@ config_terminal_settings:
     lea         rdx, [new_termios]
     syscall
     ret
+
+print_score:
+    lea         r12, [scoretext]
+    mov         r13, scoretextlen
+    call        print_string
+    mov         r12, score
+    call        print_usigned_int
+    println
+    println
+    ret
+
+gameover:
+    call        clear_screen
+    println
+    lea         r12, [gameovertext]
+    mov         r13, gameovertextlen
+    call        print_string
+    println
+    call        print_score
+    jmp         exit
