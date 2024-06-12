@@ -401,6 +401,24 @@ check_apple:
 eat_apple:
     inc         qword ptr [score] 
     mov         byte ptr [rsi + rbx], SNAKE_HEAD
+    /* append a new body part to the linked list */
+    /* allocate memory for a new body part */
+    malloc      SIZEOF_BODYPART
+    mov         rbx, rax
+    xor         rax, rax
+    mov         rdx, [tail]
+    mov         ax, [rdx]
+    mov         [rbx], ax
+    mov         ax, [rdx + SIZE_OF_SHORT]
+    mov         [rbx + SIZE_OF_SHORT], ax
+    /* set the new element's parent to the previous tail */
+    mov         [rbx + SIZE_OF_SHORT + SIZE_OF_SHORT], rdx
+    /* set the previous tail's next to the new element */
+    mov         [rdx + SIZE_OF_SHORT + SIZE_OF_SHORT + SIZE_OF_POINTER], rbx
+    mov         qword ptr [tail], rbx
+here:
+    lea         rbx, [tail]
+
     call        place_apple
     ret
 
