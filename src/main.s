@@ -18,12 +18,12 @@
 .equ DIRECTION.LEFT,            2
 .equ DIRECTION.RIGHT,           3
 
-.equ KEY.UP,            65
-.equ KEY.DOWN,          66
-.equ KEY.RIGHT,         67
-.equ KEY.LEFT,          68
-.equ KEY.ESCAPE,        27
-.equ KEY.ESCAPE_SEQ,    91
+.equ KEY.UP,                    65
+.equ KEY.DOWN,                  66
+.equ KEY.RIGHT,                 67
+.equ KEY.LEFT,                  68
+.equ KEY.ESCAPE,                27
+.equ KEY.ESCAPE_SEQ,            91
 
 .macro printr register=rax
     mov     r12, \register
@@ -44,6 +44,21 @@
     popr    rdi, rsi, rdx, rcx, rbx, rax, r13, r12
 .endm
 
+.macro printunicode character
+    pushr   r12, r13, rax, rbx, rcx, rdx, rsi, rdi
+    lea     r12, \character
+    mov     r13, 3
+    call    print_string
+    popr    rdi, rsi, rdx, rcx, rbx, rax, r13, r12
+.endm
+
+.macro printunicode_nopreserve character
+    lea     r12, \character
+    mov     r13, 3
+    call    print_string
+
+.endm
+
 .macro printchar_nopreserve character
     lea     r12, \character
     mov     r13, 1
@@ -60,6 +75,12 @@
     /* snakehead location = snakeheady * WIDTH + snakeheadx */
     imul    bx, dx
     add     bx, ax
+
+    .if \object == SNAKE_HEAD
+    /* check if it had an apple previously */
+    jmp     check_apple
+    .endif
+
     mov     byte ptr [rsi + rbx], \object
     /* mov    byte ptr [rsi + rbx - 1], SNAKE_BODY
     mov     byte ptr [rsi + rbx - 2], SNAKE_BODY */
@@ -67,20 +88,25 @@
 
 .data
 
-wall:           .ascii "#"
-newline:        .ascii "\n"
-clr:            .ascii "\033c"
-blank:          .ascii " "
-apple:          .ascii "@"
-snakehead:      .ascii "*"
-snakebody:      .ascii "+"
-scoretext:      .ascii "Score: "
-scoretextlen    = $ - scoretext
-snakeheady:     .short SNAKE_HEAD_INIIIAL_Y
-snakeheadx:     .short SNAKE_HEAD_INITIAL_X
-sleepreq:       .quad 1, 0
-score:          .quad 0
-currentdir:     .byte DIRECTION.RIGHT
+horizontalwall:     .byte 0xe2, 0x94, 0x80 # ─
+verticalwall:       .byte 0xe2, 0x94, 0x82 # │
+topleftwall:        .byte 0xe2, 0x94, 0x8c # ┌
+toprightwall:       .byte 0xe2, 0x94, 0x90 # ┐
+bottomleftwall:     .byte 0xe2, 0x94, 0x94 # └
+bottomrightwall:    .byte 0xe2, 0x94, 0x98 # ┘
+apple:              .byte 0xe2, 0x98, 0x85 # ★
+snakehead:          .byte 0xe2, 0x9a, 0x89 # ⚉
+newline:            .ascii "\n"
+clr:                .ascii "\033c"
+blank:              .ascii " "
+snakebody:          .ascii "+"
+scoretext:          .ascii "Score: "
+scoretextlen        = $ - scoretext
+snakeheady:         .short SNAKE_HEAD_INIIIAL_Y
+snakeheadx:         .short SNAKE_HEAD_INITIAL_X
+sleepreq:           .quad 1, 0
+score:              .quad 0
+currentdir:         .byte DIRECTION.RIGHT
 
 .bss
 
@@ -114,15 +140,20 @@ gameloop:
 
 draw_grid:
     call        clear_screen
+    println
     lea         r12, [scoretext]
     mov         r13, scoretextlen
     call        print_string
     mov         r12, score
     call        print_usigned_int
     println
+    println
     /* draw the top wall */
+    printunicode_nopreserve [topleftwall]
     call        draw_horizontal_boundary
-    printchar_nopreserve [wall]
+    printunicode_nopreserve [toprightwall]
+    println
+    printunicode_nopreserve [verticalwall]
     /* row index */
     mov         r14, 1
     /* column index */
@@ -148,19 +179,22 @@ draw_grid_cont:
     jmp         draw_grid_start
 draw_grid_done:
     /* draw the bottom wall */
+    printunicode_nopreserve [bottomleftwall]
     call        draw_horizontal_boundary
+    printunicode_nopreserve [bottomrightwall]
+    println
     ret
 
 move_new_row:
     inc         r14
     mov         r15, 1
     pushr       r12, r13, rax, rbx, rcx, rdx, rsi, rdi
-    printchar_nopreserve [wall]
+    printunicode_nopreserve [verticalwall]
     println
     popr        rdi, rsi, rdx, rcx, rbx, rax, r13, r12
     cmp         r14, HEIGHT
     jge         draw_grid_done
-    printchar   [wall]
+    printunicode [verticalwall]
     jmp         draw_grid_start
 
 print_space:
@@ -168,7 +202,7 @@ print_space:
     jmp         draw_grid_cont
 
 print_snake_head:
-    printchar   [snakehead]
+    printunicode [snakehead]
     jmp         draw_grid_cont
 
 print_snake_body:
@@ -176,20 +210,20 @@ print_snake_body:
     jmp         draw_grid_cont
 
 print_apple:
-    printchar   [apple]
+    printunicode [apple]
     jmp         draw_grid_cont
 
 draw_horizontal_boundary:
-    lea         r12, [blank]
+    /* lea         r12, [blank]
     mov         r13, 1
-    call        print_string
+    call        print_string */
     mov         rcx, WIDTH
 draw_horizontal_boundary_loop:
     push        rcx
-    printchar   [wall]
+    printunicode [horizontalwall]
     pop         rcx
     loop        draw_horizontal_boundary_loop
-    println
+    /* println */
     ret
 
     /* prepare teh grid, snake and apple */
@@ -226,7 +260,7 @@ clear_screen:
 
 sleep:
     mov         qword ptr [sleepreq], 1
-    mov         qword ptr [sleepreq + 32], 0
+    mov         qword ptr [sleepreq + 8], 0
     mov         rax, SYS_NANOSLEEP
     lea         rdi, [sleepreq]
     syscall
@@ -270,6 +304,18 @@ moveright:
     mov         byte ptr [currentdir], DIRECTION.RIGHT
     inc         dword ptr [snakeheadx]
     call        place_head
+    ret
+
+check_apple:
+    cmp         byte ptr [rsi + rbx], APPLE
+    je          eat_apple
+    mov         byte ptr [rsi + rbx], SNAKE_HEAD
+    ret
+
+eat_apple:
+    inc         qword ptr [score] 
+    mov         byte ptr [rsi + rbx], SNAKE_HEAD
+    call        place_apple
     ret
 
 readkey:
