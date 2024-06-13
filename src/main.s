@@ -66,6 +66,11 @@
 .endm
 
 .macro set_on_snakes_head object
+
+    .if \object == SNAKE_HEAD
+    call    check_boundaries
+    .endif
+
     lea     rsi, [grid]
     xor     rax, rax
     xor     rbx, rbx
@@ -401,6 +406,59 @@ check_apple:
 check_eating_self:
     cmp         byte ptr [rsi + rbx], SNAKE_BODY
     je          gameover
+    ret
+
+check_boundaries:
+
+    /* check if we have hit the horizontal walls */
+    xor         rax, rax
+    mov         ax, [snakeheadx]
+    cmp         ax, -1
+    je          hit_left_boundary
+    cmp         ax, WIDTH + 1
+    je          hit_right_boundary
+    /* check if we have hit the vertical walls */
+    mov         ax, [snakeheady]
+    cmp         ax, -1
+    je          hit_top_boundary
+    cmp         ax, HEIGHT + 1
+    je          hit_bottom_boundary
+    ret
+
+hit_left_boundary:
+    cmp         byte ptr [currentdir], DIRECTION.LEFT
+    je          emerge_from_right_vertical_boundary
+    ret
+
+hit_right_boundary:
+    cmp         byte ptr [currentdir], DIRECTION.RIGHT
+    je          emerge_from_left_vertical_boundary
+    ret
+
+hit_top_boundary:
+    cmp         byte ptr [currentdir], DIRECTION.UP
+    je          emerge_from_bottom_boundary
+    ret
+
+hit_bottom_boundary:
+    cmp         byte ptr [currentdir], DIRECTION.DOWN
+    je          emerge_from_top_boundary
+    ret
+    
+emerge_from_right_vertical_boundary:
+    mov         word ptr [snakeheadx], WIDTH
+    ret
+
+emerge_from_left_vertical_boundary:
+    mov         word ptr [snakeheadx], 0
+    ret
+
+emerge_from_top_boundary:
+    mov         word ptr [snakeheady], 0
+    ret
+
+emerge_from_bottom_boundary:
+    mov         word ptr [snakeheady], HEIGHT
     ret
 
 eat_apple:
